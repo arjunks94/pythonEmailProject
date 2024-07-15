@@ -2,32 +2,57 @@ import smtplib
 import os
 from email.message import EmailMessage
 from cryptography.fernet import Fernet
+import logging
+from datetime import datetime
 
 # Configuration for email
-smtp_server = "smtp.gmail.com"
 smtp_port = 587
-from_email = "opera.ssp@sunsiyam.com"
-subject = "OPERA SSP H&F Reports"
-body = "OPERA SSP H&F TR and RR Reports Attached"
 
-
-#path for Ubuntu
-#source_folder = "/path/to/Email_SSP"  
-#archive_folder = "/path/to/Archive" 
-
-# Paths for Windows
+# Config groups for loop
 folder_configs = [
     {
-        "source_folder": r"E:\Email\reports_group1",  
-        "archive_folder": r"E:\Email\archive_group1",  
-        "to_emails": ["group1@example.com"]
+        "source_folder": "/home/user/Desktop/pyproject/test/email",  # Update with the correct path
+        "archive_folder": "/home/user/Desktop/pyproject/test/archive",  # Update with the correct path
+        "to_emails": ["group1@example.com"],
+        "subject": "Group 1: OPERA SSP H&F Reports",
+        "body": """<html>
+                    <body>
+                        <p>Group 1: OPERA SSP H&F TR and RR Reports Attached</p>
+                        <p>Additional Information:</p>
+                        <ul>
+                            <li>Report 1: Details...</li>
+                            <li>Report 2: Details...</li>
+                            <li>Report 3: Details...</li>
+                        </ul>
+                    </body>
+                   </html>"""
     },
     {
-        "source_folder": r"E:\Email\reports_group2",  
-        "archive_folder": r"E:\Email\archive_group2",  
-        "to_emails": ["group2@example.com"]
+        "source_folder": "/home/user/Desktop/pyproject/test/email",  # Update with the correct path
+        "archive_folder": "/home/user/Desktop/pyproject/test/archive",  # Update with the correct path
+        "to_emails": ["group2@example.com"],
+        "subject": "Group 2: OPERA SSP H&F Reports",
+        "body": """<html>
+                    <body>
+                        <p>Group 2: OPERA SSP H&F TR and RR Reports Attached</p>
+                        <p>Additional Information:</p>
+                        <ul>
+                            <li>Report 1: Details...</li>
+                            <li>Report 2: Details...</li>
+                            <li>Report 3: Details...</li>
+                        </ul>
+                    </body>
+                   </html>"""
     }
 ]
+
+# Define the log folder and log file name
+log_folder = "/path/to/logFolder"  # Update with the correct path
+log_file = os.path.join(log_folder, f"email_log_{datetime.now().strftime('%Y%m%d_%H%M%S')}.log")
+
+# Set up logging
+logging.basicConfig(filename=log_file, level=logging.INFO,
+                    format='%(asctime)s:%(levelname)s:%(message)s')
 
 # Load the key
 with open('key.key', 'rb') as key_file:
@@ -36,20 +61,26 @@ with open('key.key', 'rb') as key_file:
 # Initialize the Fernet object with the key
 cipher_suite = Fernet(key)
 
-# Load and decrypt the password
+# Decrypt the email, SMTP server, and password
+with open('encrypted_from_email.bin', 'rb') as file:
+    encrypted_from_email = file.read()
+with open('encrypted_smtp_server.bin', 'rb') as file:
+    encrypted_smtp_server = file.read()
 with open('encrypted_password.bin', 'rb') as file:
     encrypted_password = file.read()
 
-smtp_password = cipher_suite.decrypt(encrypted_password).decode()  # Decrypt and decode the password
+from_email = cipher_suite.decrypt(encrypted_from_email).decode()
+smtp_server = cipher_suite.decrypt(encrypted_smtp_server).decode()
+smtp_password = cipher_suite.decrypt(encrypted_password).decode()  # Decrypt function
 
 # Function to send email with attachments
-def send_email(source_folder, archive_folder, to_emails):
+def send_email(source_folder, archive_folder, to_emails, subject, body):
     # Create the email message
     msg = EmailMessage()
     msg["From"] = from_email
     msg["To"] = ", ".join(to_emails)
     msg["Subject"] = subject
-    msg.set_content(body)
+    msg.set_content(body, subtype='html')  # Set content type to HTML
 
     # Attach .txt files from the source folder
     for file_name in os.listdir(source_folder):
@@ -66,9 +97,9 @@ def send_email(source_folder, archive_folder, to_emails):
             server.starttls()
             server.login(from_email, smtp_password)
             server.send_message(msg)
-        print(f"Email sent successfully to {', '.join(to_emails)}")
+        logging.info(f"Email sent successfully to {', '.join(to_emails)}")
     except Exception as e:
-        print(f"Failed to send email to {', '.join(to_emails)}: {e}")
+        logging.error(f"Failed to send email to {', '.join(to_emails)}: {e}")
 
     # Move files to the archive folder
     for file_name in os.listdir(source_folder):
@@ -79,4 +110,4 @@ def send_email(source_folder, archive_folder, to_emails):
 
 # Process each folder configuration
 for config in folder_configs:
-    send_email(config["source_folder"], config["archive_folder"], config["to_emails"])
+    send_email(config["source_folder"], config["archive_folder"], config["to_emails"], config["subject"], config["body"])
